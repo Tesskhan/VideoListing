@@ -1,194 +1,152 @@
-import React, { useState } from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet, TextInput, ScrollView } from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons';
-import Feather from 'react-native-vector-icons/Feather';
-import DeleteConfirmationModal from '../DeleteConfirmationModal';  // Importar el componente
-import FSection from '../FSection';
-import HSection from '../HSection';
+import React, { useState } from "react";
+import { View, Text, FlatList, TouchableOpacity, StyleSheet } from "react-native";
+import { useNavigation } from '@react-navigation/native';
+import FSection from '../Components/FSection'; // Assuming this is your custom footer section
+import Icon from 'react-native-vector-icons/FontAwesome';
 
+const YourFavourites = () => {
+  const navigation = useNavigation();
+  const [lists, setLists] = useState([]); // Placeholder for list data
+  const [pressedItems, setPressedItems] = useState({});
 
-const defaultImage = require('../../assets/images/default_image_square.jpg');
-
-const YourFavourites = ({ onPress, navigation }) => {
-
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [items, setItems] = useState(Array.from({ length: 10 }, (_, i) => i + 1));
-  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
-  const [selectedItem, setSelectedItem] = useState(null);
   const handlePress = (id) => {
-    console.log("Han clicat al botó " + id);
-    if (id == 1){
-      navigation.navigate("mapScreen");
-    }else if (id == 2){
-      navigation.navigate("FavouritesScreen");
-    }else if (id == 3){
-      navigation.navigate("userScreen");
-    }
-  };
-  const handleHPress = () => {
-    
-  }
-
-  const handleEditPress = () => {
-    setIsEditMode(!isEditMode);
+    if (id === 1) navigation.navigate("YourFavourites");
+    else if (id === 2) navigation.navigate("YourLists");
+    else if (id === 3) navigation.navigate("YourProfile");
   };
 
-  const handleDeletePress = (itemId) => {
-    setSelectedItem(itemId);
-    setDeleteModalVisible(true);
+  const handlePressIn = (index) => {
+    setPressedItems((prevState) => ({ ...prevState, [index]: true }));
   };
 
-  const confirmDelete = () => {
-    setItems((prevItems) => prevItems.filter((item) => item !== selectedItem));
-    setDeleteModalVisible(false); 
+  const handlePressOut = (index) => {
+    setPressedItems((prevState) => ({ ...prevState, [index]: false }));
   };
 
-  const cancelDelete = () => {
-    setDeleteModalVisible(false); 
-    setSelectedItem(null);
+  const renderListItem = ({ item, index }) => {
+    return (
+      <TouchableOpacity
+        style={[styles.card, pressedItems[index] && { backgroundColor: '#DDD' }]} // Adjust background color when pressed
+        onPressIn={() => handlePressIn(index)}
+        onPressOut={() => handlePressOut(index)}
+      >
+        <View style={styles.cardContent}>
+          <Text style={styles.cardTitle}>{item.title}</Text>
+          <Text style={styles.cardDescription}>{item.description}</Text>
+        </View>
+        <Icon name="chevron-right" style={styles.arrowSymbol} />
+      </TouchableOpacity>
+    );
   };
 
   return (
-    <View style={{ flex: 1 , backgroundColor: '#1a1a1a',}}>
+    <View style={styles.container}>
+      {/* Title */}
+      <Text style={styles.title}>Your Lists</Text>
 
-      <View style={{ flex: 1 }}>
-        <HSection currentSection={2} onPress={handleHPress} />
-      </View>
+      {/* Filter Button */}
+      <TouchableOpacity style={styles.filterButton}>
+        <Icon name="filter" size={20} color="white" />
+        <Text style={styles.filterText}>Filter</Text>
+      </TouchableOpacity>
 
-
-      <View style={{ flex: 8, width: '100%' }}>
-        <View style={{ marginTop: 20, flex: 1 }}>
-          <View style={styles.screenContainer}>
-            <View style={styles.headerContainer}>
-              <TextInput
-                placeholder="Search..."
-                placeholderTextColor="#aaa"
-                style={styles.searchBar}
-              />
-              <TouchableOpacity style={styles.editIcon} onPress={handleEditPress}>
-                <Feather name="edit" size={30} color="#fff" />
-              </TouchableOpacity>
-            </View>
-
-            <DeleteConfirmationModal 
-              visible={deleteModalVisible} 
-              onConfirm={confirmDelete} 
-              onCancel={cancelDelete} 
-            />
-
-            <ScrollView contentContainerStyle={styles.scrollContainer}>
-              {items.map((item) => (
-                <View key={item} style={[styles.container, isEditMode && styles.containerEditMode]}>
-                  <Image source={defaultImage} style={styles.image} />
-                  <View style={styles.textContainer}>
-                    <Text style={styles.title}>Title {item}</Text>
-                    <Text style={styles.coordinates}>Description for item {item}</Text>
-                    <Text style={styles.coordinates}>1 Day Ago</Text>
-                  </View>
-                  {isEditMode && (
-                    <TouchableOpacity style={styles.trashButton} onPress={() => handleDeletePress(item)}>
-                      <Icon name="trash" size={24} color="#000" />
-                    </TouchableOpacity>
-                  )}
-                  {!isEditMode && (
-                    <TouchableOpacity style={styles.button} onPress={onPress}>
-                      <Icon name="chevron-forward" size={24} color="#000" />
-                    </TouchableOpacity>
-                  )}
-                </View>
-              ))}
-            </ScrollView>
+      {/* Lists */}
+      <FlatList
+        data={lists}
+        renderItem={renderListItem}
+        keyExtractor={(item, index) => index.toString()}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No lists yet. Create one!</Text>
           </View>
-        </View>
-      </View>
+        }
+      />
 
-
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 0 }}>
-        <FSection currentSection={2} onPress={handlePress} />
+      {/* Footer section */}
+      <View style={styles.footerContainer}>
+        <FSection currentSection={1} onPress={handlePress} />
       </View>
     </View>
-
-);
-
-};  
+  );
+};
 
 const styles = StyleSheet.create({
-  screenContainer: {
-    flex: 1,
-    backgroundColor: '#1a1a1a',
-    width: '100%', // Asegura que ocupe todo el ancho disponible
+  container: { 
+    flex: 1, 
+    backgroundColor: "#222", 
+    paddingHorizontal: 20, 
+    paddingTop: 30, 
   },
-  headerContainer: {
+  title: { 
+    fontSize: 28, 
+    fontWeight: "bold", 
+    color: "#FFF", 
+    textAlign: "center", 
+    margin: 30, 
+  },
+  filterButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 15,
-    paddingHorizontal: 10, // Agregado para asegurar márgenes
-  },
-  searchBar: {
-    flex: 1,
-    backgroundColor: '#333',
-    color: '#fff',
-    padding: 10,
-    borderRadius: 25,
-    paddingHorizontal: 15,
-    fontSize: 16,
-  },
-  editIcon: {
-    marginLeft: 10,
-  },
-  scrollContainer: {
-    paddingBottom: 20,
-  },
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 10,
-    backgroundColor: '#fff',
-    borderWidth: 4,
-    borderColor: '#333',
-    borderRadius: 10,
-    marginVertical: 5,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    position: 'relative',
-  },
-  containerEditMode: {
-    borderColor: '#8B0000',
-  },
-  image: {
-    width: '30%',
-    height: 100,
-    marginRight: 10,
-    borderRadius: 8,
-  },
-  textContainer: {
-    flex: 1,
     justifyContent: 'center',
+    backgroundColor: '#777',
+    width: 110,
+    height: 40,
+    borderRadius: 20,
+    alignSelf: 'center',
+    marginBottom: 20,
   },
-  title: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#000',
+  filterText: { 
+    marginLeft: 8, 
+    color: 'white', 
+    fontSize: 16, 
+    fontWeight: 'bold' 
+  },
+  card: {
+    backgroundColor: "#EEE",
+    padding: 15,
+    borderRadius: 10,
     marginBottom: 10,
+    minHeight: 100, // Ensure the card is high enough for two lines of description
+    flexDirection: "row", // Align text and arrow side by side
+    justifyContent: "space-between", // Place the arrow on the right
+    alignItems: "center", // Align the content vertically
   },
-  coordinates: {
+  cardContent: {
+    flex: 1, // Make sure the text takes up the available space
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#333",
+  },
+  cardDescription: {
     fontSize: 14,
-    color: '#777',
+    color: "#666",
+    marginTop: 5,
+    lineHeight: 18, // Ensure two lines of description fit comfortably
   },
-  button: {
-    position: 'absolute',
-    top: 50,
-    right: 10,
+  arrowSymbol: {
+    fontSize: 20,
+    color: "#444", // Set the color of the arrow
+    padding: 10, // Add space between text and the arrow
   },
-  trashButton: {
-    position: 'absolute',
-    top: 47,
-    right: 10,
+  emptyContainer: { 
+    flex: 1, 
+    justifyContent: "center", 
+    alignItems: "center", 
+    marginTop: 50, 
+  },
+  emptyText: { 
+    fontSize: 16, 
+    color: "#999", 
+  },
+  footerContainer: { 
+    position: 'absolute', 
+    left: 0, 
+    right: 0, 
+    bottom: 0, 
+    zIndex: 1 
   },
 });
-
 
 export default YourFavourites;
