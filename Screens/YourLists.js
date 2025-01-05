@@ -10,7 +10,6 @@ const YourLists = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [newListName, setNewListName] = useState("");
   const [newListDescription, setNewListDescription] = useState("");
-  const [pressedItems, setPressedItems] = useState({});
 
   const handlePress = (id) => {
     if (id === 1) navigation.navigate("YourFavourites");
@@ -20,27 +19,18 @@ const YourLists = () => {
 
   const handleAddList = () => {
     if (newListName.trim() && newListDescription.trim()) {
-      setLists([...lists, { title: newListName, description: newListDescription }]);
+      setLists([...lists, { title: newListName, description: newListDescription, seen: false }]);
       setNewListName("");
       setNewListDescription("");
       setModalVisible(false);
     }
   };
 
-  const handlePressIn = (index) => {
-    setPressedItems((prevState) => ({ ...prevState, [index]: true }));
-  };
-
-  const handlePressOut = (index) => {
-    setPressedItems((prevState) => ({ ...prevState, [index]: false }));
-  };
-
-  const renderListItem = ({ item, index }) => {
+  const renderListItem = ({ item }) => {
     return (
       <TouchableOpacity
-        style={[styles.card, pressedItems[index] && { backgroundColor: '#DDD' }]} // Adjust background color when pressed
-        onPressIn={() => handlePressIn(index)}
-        onPressOut={() => handlePressOut(index)}
+        style={[styles.card]}
+        onPress={() => navigation.navigate('ListVideos', { list: item })} // Navigate to ListVideos
       >
         <View style={styles.cardContent}>
           <Text style={styles.cardTitle}>{item.title}</Text>
@@ -54,12 +44,7 @@ const YourLists = () => {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Your Lists</Text>
-
-      <TouchableOpacity style={styles.filterButton}>
-        <Icon name="filter" size={20} color="white" />
-        <Text style={styles.filterText}>Filter</Text>
-      </TouchableOpacity>
-
+ 
       <FlatList
         data={lists}
         renderItem={renderListItem}
@@ -145,25 +130,8 @@ const styles = StyleSheet.create({
     textAlign: "center", 
     margin: 30, 
   },
-  filterButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#777',
-    width: 110,
-    height: 40,
-    borderRadius: 20,
-    alignSelf: 'center',
-    marginBottom: 20,
-  },
-  filterText: { 
-    marginLeft: 8, 
-    color: 'white', 
-    fontSize: 16, 
-    fontWeight: 'bold' 
-  },
   card: {
-    backgroundColor: "#EEE",
+    backgroundColor: "#CCC",
     padding: 15,
     borderRadius: 10,
     marginBottom: 10,
@@ -195,7 +163,7 @@ const styles = StyleSheet.create({
     flex: 1, 
     justifyContent: "center", 
     alignItems: "center", 
-    marginTop: 50, 
+    marginTop: 25, 
   },
   emptyText: { 
     fontSize: 16, 

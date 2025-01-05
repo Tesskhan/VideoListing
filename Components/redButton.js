@@ -13,8 +13,8 @@ const RedButton = ({ title, onPress }) => {
 
 const styles = StyleSheet.create({
     centeredContainer: {
-        flex: 1,  // Take up full screen space
-        justifyContent: 'center',  // Center vertically
+        flex: 1,  // Take up full screen spaces
+        marginTop: 50,
         alignItems: 'center',  // Center horizontally
         padding: 20,  // Add some padding
     },

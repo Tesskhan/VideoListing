@@ -42,7 +42,7 @@ const YourFavourites = () => {
   return (
     <View style={styles.container}>
       {/* Title */}
-      <Text style={styles.title}>Your Lists</Text>
+      <Text style={styles.title}>Your Favourites</Text>
 
       {/* Filter Button */}
       <TouchableOpacity style={styles.filterButton}>
@@ -57,7 +57,7 @@ const YourFavourites = () => {
         keyExtractor={(item, index) => index.toString()}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No lists yet. Create one!</Text>
+            <Text style={styles.emptyText}>No favourite videos yet.</Text>
           </View>
         }
       />

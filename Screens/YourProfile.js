@@ -34,7 +34,7 @@ export default function YourProfile() {
 
             {/* Sign Out Button */}
             <RedButton
-                title="Sign Out"
+                title="Log Out"
                 onPress={() => setModalVisible(true)} // Open sign-out modal
             />
 
