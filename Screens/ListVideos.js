@@ -121,7 +121,7 @@ const ListVideos = () => {
           <View style={styles.buttonRow}>
             <TouchableOpacity onPress={() => handleSeenToggle(item.url)} style={styles.button}>
               <Icon
-                name={!seen ? "eye" : "eye-slash"}
+                name={seen ? "eye" : "eye-slash"}
                 size={20}
                 color="gray"
               />
@@ -163,7 +163,7 @@ const ListVideos = () => {
         data={updatedList.content.filter((video) => {
           // Check if the video has been marked as seen
           const isSeen = seenVideos[video.url] || false; // Default to false if not tracked
-          return isSelected ? !isSeen : isSeen; // Filter based on the "isSelected" state
+          return isSelected ? isSeen : !isSeen; // Filter based on the "isSelected" state
         })}
         keyExtractor={(item) => item.url}
         renderItem={renderListItem}
