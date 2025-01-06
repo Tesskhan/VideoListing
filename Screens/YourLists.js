@@ -10,6 +10,8 @@ const YourLists = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [newListName, setNewListName] = useState("");
   const [newListDescription, setNewListDescription] = useState("");
+  const [isBinActive, setIsBinActive] = useState(false);
+  const [selectedLists, setSelectedLists] = useState({});
 
   const handlePress = (id) => {
     if (id === 1) navigation.navigate("YourFavourites");
@@ -26,17 +28,58 @@ const YourLists = () => {
     }
   };
 
-  const renderListItem = ({ item }) => {
+  const handleDeleteSelected = () => {
+    if (isBinActive) {
+      // Delete selected lists
+      const filteredLists = lists.filter((_, index) => !selectedLists[index]);
+      setLists(filteredLists);
+      setSelectedLists({});
+      setIsBinActive(false);
+    } else {
+      // Activate bin mode
+      setIsBinActive(true);
+    }
+  };
+  
+  const handleCancelDelete = () => {
+    setIsBinActive(false);
+    setSelectedLists({});
+  };
+  
+  const toggleSelection = (index) => {
+    setSelectedLists((prev) => ({
+      ...prev,
+      [index]: !prev[index], // Toggle the selection status
+    }));
+  };
+  
+  const renderListItem = ({ item, index }) => {
+    const isSelected = !!selectedLists[index]; // Check if the current item is selected
+  
     return (
       <TouchableOpacity
-        style={[styles.card]}
-        onPress={() => navigation.navigate('ListVideos', { list: item })} // Navigate to ListVideos
+        style={[
+          styles.card,
+        ]}
+        onPress={() => {
+          if (isBinActive) {
+            toggleSelection(index); // Toggle selection in bin mode
+          } else {
+            navigation.navigate('ListVideos', { list: item }); // Navigate if not in bin mode
+          }
+        }}
       >
         <View style={styles.cardContent}>
           <Text style={styles.cardTitle}>{item.title}</Text>
           <Text style={styles.cardDescription}>{item.description}</Text>
         </View>
-        <Icon name="chevron-right" style={styles.arrowSymbol} />
+        {isBinActive && (
+          <Icon
+            name={isSelected ? "check" : "times"}
+            size={20}
+            color={isSelected ? "green" : "red"}
+          />
+        )}
       </TouchableOpacity>
     );
   };
@@ -56,16 +99,38 @@ const YourLists = () => {
         }
       />
 
-      {/* Add and Bin buttons */}
-      <View style={styles.extraButtonsRow}>
-        <TouchableOpacity style={styles.extraButton} onPress={() => console.log("Bin Pressed")}>
-          <Icon name="trash" size={30} color="white" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.extraButton} onPress={() => setModalVisible(true)}>
-          <Icon name="plus" size={30} color="white" />
-        </TouchableOpacity>
-      </View>
-
+      {/* Extra buttons */}
+        <View style={styles.extraButtonsRow}>
+          {/* Bin Button */}
+          <TouchableOpacity 
+            style={[styles.extraButton, isBinActive ? styles.binActiveButton : null]} 
+            onPress={handleDeleteSelected}  // This now handles both activation and deletion
+          >
+            <Icon 
+              name={isBinActive ? "check" : "trash"}  // 'check' for confirmation, 'trash' for initial state
+              size={30} 
+              color="white" 
+            />
+          </TouchableOpacity>
+  
+          {/* Add / Cross Button */}
+          <TouchableOpacity 
+            style={[styles.extraButton, isBinActive ? styles.addActiveButton : null]} 
+            onPress={() => {
+              if (isBinActive) {
+                setIsBinActive(false);  // Cancel the delete mode if bin is active
+              } else {
+                setModalVisible(true);   // Show the modal for adding a video if bin is inactive
+              }
+            }}
+          >
+            <Icon 
+              name={isBinActive ? "times" : "plus"}  // Show 'times' when bin is active, else 'plus'
+              size={30} 
+              color="white" 
+            />
+          </TouchableOpacity>
+        </View>
       {/* Add List Modal */}
       <Modal visible={modalVisible} transparent animationType="slide">
         <View style={styles.modalContainer}>
@@ -117,31 +182,44 @@ const YourLists = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: "#222", 
-    paddingHorizontal: 20, 
-    paddingTop: 30, 
+  // General container styles
+  container: {
+    flex: 1,
+    backgroundColor: "#222",
+    paddingHorizontal: 20,
+    paddingTop: 30,
   },
-  title: { 
-    fontSize: 28, 
-    fontWeight: "bold", 
-    color: "#FFF", 
-    textAlign: "center", 
-    margin: 30, 
+  title: {
+    fontSize: 28,
+    fontWeight: "bold",
+    color: "#FFF",
+    textAlign: "center",
+    margin: 30,
   },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 25,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: "#999",
+  },
+
+  // Card styles
   card: {
     backgroundColor: "#CCC",
     padding: 15,
     borderRadius: 10,
     marginBottom: 10,
-    minHeight: 100, // Ensure the card is high enough for two lines of description
-    flexDirection: "row", // Align text and arrow side by side
-    justifyContent: "space-between", // Place the arrow on the right
-    alignItems: "center", // Align the content vertically
+    minHeight: 100,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   cardContent: {
-    flex: 1, // Make sure the text takes up the available space
+    flex: 1,
   },
   cardTitle: {
     fontSize: 18,
@@ -152,107 +230,116 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#666",
     marginTop: 5,
-    lineHeight: 18, // Ensure two lines of description fit comfortably
+    lineHeight: 18,
   },
   arrowSymbol: {
     fontSize: 20,
-    color: "#444", // Set the color of the arrow
-    padding: 10, // Add space between text and the arrow
-  },
-  emptyContainer: { 
-    flex: 1, 
-    justifyContent: "center", 
-    alignItems: "center", 
-    marginTop: 25, 
-  },
-  emptyText: { 
-    fontSize: 16, 
-    color: "#999", 
-  },
+    color: "#444",
+    padding: 10,
+  },  
+
+  // Extra buttons
   extraButtonsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    position: 'absolute',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    position: "absolute",
     bottom: 90,
     left: 15,
     right: 15,
   },
   extraButton: {
-    backgroundColor: '#777',
+    backgroundColor: "#777",
     width: 60,
     height: 60,
     borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     elevation: 3,
   },
-  footerContainer: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 1 },
+  binActiveButton: {
+    backgroundColor: "#3B0",
+  },
+  addActiveButton: {
+    backgroundColor: "#B00",
+  },
+
+  // Modal styles
   modalContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   modalContent: {
-    width: '80%',
-    backgroundColor: '#444',
+    width: "80%",
+    backgroundColor: "#444",
     borderRadius: 15,
     padding: 20,
-    alignItems: 'center',
+    alignItems: "center",
   },
-  modalTitle: { 
-    fontSize: 20, 
-    color: 'white',
-    fontWeight: 'bold', 
-    marginBottom: 15, 
+  modalTitle: {
+    fontSize: 20,
+    color: "white",
+    fontWeight: "bold",
+    marginBottom: 15,
   },
   inputName: {
-    width: '100%',
+    width: "100%",
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: "#333",
     borderRadius: 10,
     padding: 15,
     marginBottom: 15,
     fontSize: 16,
-    color: '#000',
-    backgroundColor: '#888',
+    color: "#000",
+    backgroundColor: "#888",
   },
   inputDescription: {
-    width: '100%',
+    width: "100%",
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: "#333",
     borderRadius: 10,
     padding: 10,
     fontSize: 16,
-    color: '#000',
-    backgroundColor: '#888',
+    color: "#000",
+    backgroundColor: "#888",
     height: 90,
-    textAlignVertical: 'top',
+    textAlignVertical: "top",
   },
   modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
     marginTop: 20,
   },
   modalButton: {
-    width: '45%',
+    width: "45%",
     paddingVertical: 12,
     borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   cancelButton: {
-    backgroundColor: '#B00',  // Red color for Cancel button
+    backgroundColor: "#B00",
   },
   confirmButton: {
-    backgroundColor: '#3B0',  // Green color for Confirm button
+    backgroundColor: "#3B0",
   },
   modalButtonText: {
-    color: 'white',
+    color: "white",
     fontSize: 16,
-    fontWeight: 'bold',
-  },  
+    fontWeight: "bold",
+  },
+
+  // Footer styles
+  footerContainer: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1,
+  },
 });
+
 
 export default YourLists;

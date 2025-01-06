@@ -14,7 +14,9 @@ const ListVideos = () => {
   const [newListDescription, setNewListDescription] = useState("");
   const [newVideoURL, setNewVideoURL] = useState("");
   const [currentVideoURL, setCurrentVideoURL] = useState("");
-  const [isSelected, setIsSelected] = useState(false); // Track button selection state
+  const [isBinActive, setIsBinActive] = useState(false);
+  const [selectedVideos, setSelectedVideos] = useState({});
+  const [isSelected, setIsSelected] = useState(false);
   const [seenVideos, setSeenVideos] = useState({});
   const [likedVideos, setLikedVideos] = useState({});
   const [updatedList, setUpdatedList] = useState({
@@ -27,6 +29,13 @@ const ListVideos = () => {
     else if (id === 2) navigation.navigate("YourLists");
     else if (id === 3) navigation.navigate("YourProfile");
   };
+
+  const handleSelectVideo = (videoId) => {
+    setSelectedVideos((prev) => ({
+      ...prev,
+      [videoId]: !prev[videoId], // Toggle selection
+    }));
+  };  
 
   const handleAddList = () => {
     if (!isValidVideoURL(newVideoURL)) {
@@ -47,6 +56,27 @@ const ListVideos = () => {
     setNewVideoURL("");
     setModalVisible(false);
   };  
+
+  const handleDeleteSelected = () => {
+    // Delete selected videos only if bin is active
+    if (isBinActive) {
+      const filteredContent = updatedList.content.filter(
+        (video) => !selectedVideos[video.url] // Keep videos that are not selected for deletion
+      );
+      setUpdatedList((prevList) => ({ ...prevList, content: filteredContent }));
+      setSelectedVideos({}); // Clear the selected videos after deletion
+      setIsBinActive(false); // Deactivate bin button after deletion
+    } else {
+      // Activate bin button for deletion confirmation
+      setIsBinActive(true);
+    }
+  };  
+  
+  const handleCancelDelete = () => {
+    // Cancel the deletion action and reset bin state
+    setIsBinActive(false);
+    setSelectedVideos({}); // Reset selected videos
+  };
 
   const isValidVideoURL = (url) => {
     return url.includes("youtube.com") || url.includes("youtu.be") || url.includes("instagram.com/p");
@@ -88,6 +118,7 @@ const ListVideos = () => {
   const renderListItem = ({ item }) => {
     let embedURL = item.url;
   
+    // Handle video URL embedding for YouTube and Instagram
     if (item.url.includes("youtube.com/watch")) {
       embedURL = `https://www.youtube.com/embed/${item.url.split("v=")[1].split("&")[0]}`;
     } else if (item.url.includes("youtu.be")) {
@@ -103,6 +134,7 @@ const ListVideos = () => {
   
     const seen = seenVideos[item.url] || false;
     const liked = likedVideos[item.url] || false;
+    const isSelected = selectedVideos[item.url] || false;
   
     return (
       <View style={styles.card}>
@@ -134,6 +166,17 @@ const ListVideos = () => {
                 color={liked ? "red" : "gray"}
               />
             </TouchableOpacity>
+  
+            {/* Show the bin icon for selection if the bin is active */}
+            {isBinActive && (
+              <TouchableOpacity onPress={() => handleSelectVideo(item.url)} style={styles.button}>
+                <Icon
+                  name={isSelected ? "check" : "times"}
+                  size={20}
+                  color={isSelected ? "green" : "red"}
+                />
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </View>
@@ -147,7 +190,7 @@ const ListVideos = () => {
         <Text style={styles.title}>{updatedList.title}</Text>
         <Text style={styles.description}>{updatedList.description}</Text>
       </View>
-
+  
       {/* Filter Button */}
       <TouchableOpacity style={styles.filterButton} onPress={() => setIsSelected(!isSelected)}>
         <Icon
@@ -157,27 +200,49 @@ const ListVideos = () => {
         />
         <Text style={styles.filterText}>{isSelected ? "Seen" : "Not Seen"}</Text>
       </TouchableOpacity>
-
+  
       {/* Video List */}
       <FlatList
         data={updatedList.content.filter((video) => {
-          // Check if the video has been marked as seen
-          const isSeen = seenVideos[video.url] || false; // Default to false if not tracked
-          return isSelected ? isSeen : !isSeen; // Filter based on the "isSelected" state
+          const isSeen = seenVideos[video.url] || false;
+          return isSelected ? isSeen : !isSeen;
         })}
         keyExtractor={(item) => item.url}
         renderItem={renderListItem}
         ListEmptyComponent={<Text style={styles.noContentText}>No content available for this filter.</Text>}
         contentContainerStyle={{ paddingBottom: 125 }}
       />
-
+  
       {/* Extra buttons */}
       <View style={styles.extraButtonsRow}>
-        <TouchableOpacity style={styles.extraButton} onPress={() => console.log("Bin Pressed")}>
-          <Icon name="trash" size={30} color="white" />
+        {/* Bin Button */}
+        <TouchableOpacity 
+          style={[styles.extraButton, isBinActive ? styles.binActiveButton : null]} 
+          onPress={handleDeleteSelected}  // This now handles both activation and deletion
+        >
+          <Icon 
+            name={isBinActive ? "check" : "trash"}  // 'check' for confirmation, 'trash' for initial state
+            size={30} 
+            color="white" 
+          />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.extraButton} onPress={() => setModalVisible(true)}>
-          <Icon name="plus" size={30} color="white" />
+
+        {/* Add / Cross Button */}
+        <TouchableOpacity 
+          style={[styles.extraButton, isBinActive ? styles.addActiveButton : null]} 
+          onPress={() => {
+            if (isBinActive) {
+              setIsBinActive(false);  // Cancel the delete mode if bin is active
+            } else {
+              setModalVisible(true);   // Show the modal for adding a video if bin is inactive
+            }
+          }}
+        >
+          <Icon 
+            name={isBinActive ? "times" : "plus"}  // Show 'times' when bin is active, else 'plus'
+            size={30} 
+            color="white" 
+          />
         </TouchableOpacity>
       </View>
 
@@ -185,7 +250,7 @@ const ListVideos = () => {
       <View style={styles.footerContainer}>
         <FSection currentSection={4} onPress={handlePress} />
       </View>
-
+  
       {/* Modal */}
       <Modal visible={modalVisible} transparent animationType="slide">
         <View style={styles.modalContainer}>
@@ -229,6 +294,7 @@ const ListVideos = () => {
 };
 
 const styles = StyleSheet.create({
+  // Container and Layout
   container: {
     flex: 1,
     backgroundColor: "#222",
@@ -250,23 +316,8 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 10,
   },
-  filterButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#777',
-    width: 110,
-    height: 40,
-    borderRadius: 20,
-    alignSelf: 'center',
-    marginBottom: 20,
-  },
-  filterText: { 
-    marginLeft: 8, 
-    color: 'white', 
-    fontSize: 16, 
-    fontWeight: 'bold' 
-  },
+
+  // Video List
   card: {
     backgroundColor: "#CCC",
     padding: 15,
@@ -277,14 +328,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-  buttonRow: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    marginTop: 10, // Adds spacing between video and buttons
-    paddingVertical: 8, // Adds padding for touch comfort
-    backgroundColor: "#EEE", // Optional background for better contrast
-    borderRadius: 8,
-  },  
   cardContent: {
     flex: 1,
   },
@@ -303,30 +346,40 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: "center",
   },
-  extraButtonsRow: {
+
+  // Button Layouts
+  buttonRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    position: "absolute",
-    bottom: 90,
-    left: 15,
-    right: 15,
-  },
-  extraButton: {
-    backgroundColor: "#777",
-    width: 60,
-    height: 60,
-    borderRadius: 10,
     justifyContent: "center",
+    marginTop: 10,
+    paddingVertical: 8,
+    backgroundColor: "#EEE",
+    borderRadius: 8,
+  },
+  button: {
+    marginHorizontal: 30,
+  },
+
+  // Filter Button
+  filterButton: {
+    flexDirection: "row",
     alignItems: "center",
-    elevation: 3,
+    justifyContent: "center",
+    backgroundColor: '#777',
+    width: 110,
+    height: 40,
+    borderRadius: 20,
+    alignSelf: 'center',
+    marginBottom: 20,
   },
-  footerContainer: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 1,
+  filterText: {
+    marginLeft: 8,
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
   },
+
+  // Modal Styles
   modalContainer: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.6)",
@@ -373,7 +426,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#333",
     borderRadius: 10,
-    padding: 10,
+    padding: 15,
     fontSize: 16,
     color: "#000",
     backgroundColor: "#888",
@@ -404,21 +457,52 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
   },
-  filterText: {
-    marginLeft: 10,
-    color: "white",
-    fontSize: 16,
+
+  // Extra Buttons (Bin, Add/Cross)
+  extraButtonsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    position: "absolute",
+    bottom: 90,
+    left: 15,
+    right: 15,
   },
+  extraButton: {
+    backgroundColor: "#777",
+    width: 60,
+    height: 60,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 3,
+  },
+  binActiveButton: {
+    backgroundColor: "#3B0", // Red background when bin is active
+  },
+  addActiveButton: {
+    backgroundColor: "#B00", // Red background for add when bin is active
+  },
+
+  // Footer
+  footerContainer: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1,
+  },
+
+  // Video Players
   youtubeVideoPlayer: {
     width: "100%",
-    height: 200, // Adjust height for YouTube videos
+    height: 200,
     marginTop: 10,
     borderRadius: 10,
     overflow: "hidden",
   },
   instagramVideoPlayer: {
     width: "100%",
-    height: 425, // Adjust height for Instagram videos (Reels or Posts)
+    height: 425,
     marginTop: 10,
     borderRadius: 10,
     overflow: "hidden",
