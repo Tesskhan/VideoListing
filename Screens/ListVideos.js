@@ -1,12 +1,15 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Modal, TextInput } from "react-native";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import Icon from "react-native-vector-icons/FontAwesome";
 import { WebView } from "react-native-webview";
 import FSection from "../Components/FSection";
+import { db, auth } from '../firebaseConfig'; // Import Firestore and Auth
+import { collection, addDoc, getDocs, deleteDoc, doc } from 'firebase/firestore';
 
 const ListVideos = () => {
-  const { params: { list } } = useRoute();
+  const { params: { list } } = useRoute();  // Ensure `list` exists in the route
+  const listId = list.id; // Get list ID from route param
   const navigation = useNavigation();
 
   const [modalVisible, setModalVisible] = useState(false);
@@ -24,6 +27,23 @@ const ListVideos = () => {
     content: list.content || [],
   });
 
+  useEffect(() => {
+    const fetchVideos = async () => {
+      const user = auth.currentUser;
+      if (user && listId) {
+        const videosQuery = collection(db, "users", user.uid, "lists", listId, "videos");
+        const querySnapshot = await getDocs(videosQuery);
+        const videos = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setUpdatedList((prev) => ({
+          ...prev,
+          content: videos,
+        }));
+      }
+    };
+  
+    fetchVideos();
+  }, [listId]);  // Re-fetch when listId changes
+  
   const handlePress = (id) => {
     if (id === 1) navigation.navigate("YourFavourites");
     else if (id === 2) navigation.navigate("YourLists");
@@ -35,39 +55,62 @@ const ListVideos = () => {
       ...prev,
       [videoId]: !prev[videoId], // Toggle selection
     }));
-  };  
+  };
 
-  const handleAddList = () => {
+  const handleAddList = async () => {
     if (!isValidVideoURL(newVideoURL)) {
       alert("Please provide a valid YouTube or Instagram video URL.");
       return;
     }
+    const user = auth.currentUser;
+    if (user) {
+      const docRef = await addDoc(collection(db, "users", user.uid, "lists", listId, "videos"), {
+        url: newVideoURL,
+        title: newListName,
+        description: newListDescription,
+      });
   
-    const newVideo = { name: newListName, description: newListDescription, url: newVideoURL };
-    const updatedContent = [...updatedList.content, newVideo];
-    setUpdatedList((prevList) => ({ ...prevList, content: updatedContent }));
+      // Append to the list content immediately
+      const newVideo = {
+        id: docRef.id,
+        url: newVideoURL,
+        title: newListName,
+        description: newListDescription,
+      };
   
-    // Automatically play the newly added video
-    handleVideoPlay(newVideoURL);
+      setUpdatedList((prev) => ({
+        ...prev,
+        content: [...prev.content, newVideo],
+      }));
   
-    // Clear inputs and close modal
-    setNewListName("");
-    setNewListDescription("");
-    setNewVideoURL("");
-    setModalVisible(false);
+      setNewListName("");
+      setNewListDescription("");
+      setModalVisible(false);
+    }
   };  
-
-  const handleDeleteSelected = () => {
-    // Delete selected videos only if bin is active
+  
+  const handleDeleteSelected = async () => {
     if (isBinActive) {
+      // Filter out the videos that are selected for deletion
+      const videosToDelete = Object.keys(selectedVideos).filter((key) => selectedVideos[key]);
       const filteredContent = updatedList.content.filter(
-        (video) => !selectedVideos[video.url] // Keep videos that are not selected for deletion
+        (video) => !selectedVideos[video.url]
       );
+  
+      // Delete from Firestore
+      const user = auth.currentUser;
+      if (user) {
+        for (const videoUrl of videosToDelete) {
+          const videoDocRef = doc(db, "users", user.uid, "lists", listId, "videos", videoUrl);
+          await deleteDoc(videoDocRef);
+        }
+      }
+  
+      // Update local state
       setUpdatedList((prevList) => ({ ...prevList, content: filteredContent }));
-      setSelectedVideos({}); // Clear the selected videos after deletion
-      setIsBinActive(false); // Deactivate bin button after deletion
+      setSelectedVideos({});
+      setIsBinActive(false);
     } else {
-      // Activate bin button for deletion confirmation
       setIsBinActive(true);
     }
   };  
