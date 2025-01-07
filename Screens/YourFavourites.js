@@ -5,35 +5,26 @@ import Icon from "react-native-vector-icons/FontAwesome";
 import { WebView } from "react-native-webview";
 import FSection from "../Components/FSection";
 import { db, auth } from '../firebaseConfig'; 
-import { collection, getDocs, updateDoc, doc } from 'firebase/firestore';
+import { collection, getDocs, updateDoc, doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 
 const YourFavourites = () => {
   const route = useRoute();
   const navigation = useNavigation();
 
-  // Set fallback in case list is undefined
-  const list = route.params?.list || { id: null, content: [], title: "", description: "" };
-  const listId = list.id;
-
   const [isSelected, setIsSelected] = useState(false);
   const [seenVideos, setSeenVideos] = useState({});
-  const [updatedList, setUpdatedList] = useState({
-    ...list,
-    content: list.content || [],
-  });
+  const [likedVideos, setLikedVideos] = useState([]);
 
   useEffect(() => {
-    const fetchVideos = async () => {
+    const fetchLikedVideos = async () => {
       const user = auth.currentUser;
-      if (user && listId) {
-        const videosQuery = collection(db, "users", user.uid, "lists", listId, "videos");
-        const querySnapshot = await getDocs(videosQuery);
+      if (user) {
+        const likedVideosQuery = collection(db, "users", user.uid, "likedVideos");
+        const querySnapshot = await getDocs(likedVideosQuery);
         const videos = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-        setUpdatedList((prev) => ({
-          ...prev,
-          content: videos,
-        }));
+        setLikedVideos(videos);
+        console.log("Fetched liked videos:", videos); // Debugging log
 
         const initialSeenState = videos.reduce((acc, video) => {
           acc[video.id] = video.seen || false;
@@ -43,8 +34,8 @@ const YourFavourites = () => {
       }
     };
 
-    fetchVideos();
-  }, [listId]);
+    fetchLikedVideos();
+  }, []);
 
   const handlePress = (id) => {
     if (id === 1) navigation.navigate("YourFavourites");
@@ -56,7 +47,7 @@ const YourFavourites = () => {
     try {
       const user = auth.currentUser;
       if (user) {
-        const videoRef = doc(db, "users", user.uid, "lists", listId, "videos", videoId);
+        const videoRef = doc(db, "users", user.uid, "likedVideos", videoId);
         const seen = !seenVideos[videoId];
 
         await updateDoc(videoRef, { seen });
@@ -68,6 +59,41 @@ const YourFavourites = () => {
       }
     } catch (error) {
       console.error("Error updating seen status: ", error);
+    }
+  };
+
+  const handleLikeToggle = async (videoId) => {
+    try {
+      const user = auth.currentUser;
+      if (user) {
+        const videoRef = doc(db, "users", user.uid, "likedVideos", videoId);
+        const liked = !likedVideos.some(video => video.id === videoId);
+
+        if (liked) {
+          const videoSnapshot = await getDoc(videoRef);
+          if (videoSnapshot.exists()) {
+            const videoData = videoSnapshot.data();
+            await setDoc(videoRef, { ...videoData, liked: true });
+            console.log("Video added to likedVideos collection:", videoData);
+          } else {
+            console.error("Video data not found for videoId:", videoId);
+          }
+        } else {
+          await deleteDoc(videoRef);
+          console.log("Video removed from likedVideos collection:", videoId);
+        }
+
+        setLikedVideos((prev) => {
+          if (liked) {
+            return [...prev, { id: videoId, liked: true }];
+          } else {
+            return prev.filter(video => video.id !== videoId);
+          }
+        });
+      }
+    } catch (error) {
+      console.error("Error updating liked status: ", error);
+      alert("Failed to update the like status. Please try again.");
     }
   };
 
@@ -88,11 +114,12 @@ const YourFavourites = () => {
     }
 
     const seen = seenVideos[item.id] || false;
+    const liked = likedVideos.some(video => video.id === item.id);
 
     return (
       <View style={styles.card}>
         <View style={styles.cardContent}>
-          <Text style={styles.cardTitle}>{item.name}</Text>
+          <Text style={styles.cardTitle}>{item.title}</Text>
           <Text style={styles.cardDescription}>{item.description}</Text>
 
           <WebView
@@ -110,6 +137,13 @@ const YourFavourites = () => {
                 color="gray"
               />
             </TouchableOpacity>
+            <TouchableOpacity onPress={() => handleLikeToggle(item.id)} style={styles.button}>
+              <Icon
+                name={liked ? "heart" : "heart-o"}
+                size={20}
+                color="red"
+              />
+            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -119,8 +153,7 @@ const YourFavourites = () => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>{updatedList.title}</Text>
-        <Text style={styles.description}>{updatedList.description}</Text>
+        <Text style={styles.title}>Your Favourites</Text>
       </View>
 
       <TouchableOpacity style={styles.filterButton} onPress={() => setIsSelected(!isSelected)}>
@@ -133,7 +166,7 @@ const YourFavourites = () => {
       </TouchableOpacity>
 
       <FlatList
-        data={updatedList.content.filter((video) => {
+        data={likedVideos.filter((video) => {
           const isSeen = seenVideos[video.id] || false;
           return isSelected ? isSeen : !isSeen;
         })}
@@ -158,19 +191,13 @@ const styles = StyleSheet.create({
     paddingTop: 30,
   },
   header: {
-    marginBottom: 20,
+    marginVertical: 30,
   },
   title: {
     fontSize: 28,
     fontWeight: "bold",
     color: "#FFF",
     textAlign: "center",
-  },
-  description: {
-    fontSize: 18,
-    color: "#BBB",
-    textAlign: "center",
-    marginTop: 10,
   },
   card: {
     backgroundColor: "#CCC",
@@ -200,9 +227,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
     marginTop: 10,
+    paddingVertical: 8,
+    backgroundColor: "#EEE",
+    borderRadius: 8,
   },
   button: {
-    marginHorizontal: 10,
+    marginHorizontal: 30,
   },
   filterButton: {
     flexDirection: "row",

@@ -5,7 +5,7 @@ import Icon from "react-native-vector-icons/FontAwesome";
 import { WebView } from "react-native-webview";
 import FSection from "../Components/FSection";
 import { db, auth } from '../firebaseConfig'; // Import Firestore and Auth
-import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, getDoc, updateDoc, setDoc, deleteDoc, doc } from 'firebase/firestore';
 
 const ListVideos = () => {
   const { params: { list } } = useRoute();  // Ensure `list` exists in the route
@@ -179,26 +179,46 @@ const ListVideos = () => {
   };  
 
   const handleLikeToggle = async (videoId) => {
-    try {
-      const user = auth.currentUser;
-      if (user) {
-        const videoRef = doc(db, "users", user.uid, "lists", listId, "videos", videoId);
-        const liked = !likedVideos[videoId]; // Toggle local liked state
-  
-        // Update the Firestore document
-        await updateDoc(videoRef, { liked });
-  
-        // Update local state
-        setLikedVideos((prev) => ({
-          ...prev,
-          [videoId]: liked,
-        }));
+  try {
+    const user = auth.currentUser;
+    if (user) {
+      const videoRef = doc(db, "users", user.uid, "lists", listId, "videos", videoId);
+      const liked = !likedVideos[videoId]; // Toggle local liked state
+
+      // Update the Firestore document
+      await updateDoc(videoRef, { liked });
+
+      // Update local state
+      setLikedVideos((prev) => ({
+        ...prev,
+        [videoId]: liked,
+      }));
+
+      // Add or remove the video from the likedVideos collection
+      const likedVideoRef = doc(db, "users", user.uid, "likedVideos", videoId);
+      if (liked) {
+        // Fetch the video data
+        const videoSnapshot = await getDoc(videoRef);
+        if (videoSnapshot.exists()) {
+          const videoData = videoSnapshot.data();
+          // Add to likedVideos collection with seen set to false
+          await setDoc(likedVideoRef, { ...videoData, liked: true, seen: false });
+          console.log("Video added to likedVideos collection:", videoData);
+        } else {
+          console.error("Video data not found for videoId:", videoId);
+        }
+      } else {
+        // Remove from likedVideos collection
+        await deleteDoc(likedVideoRef);
+        console.log("Video removed from likedVideos collection:", videoId);
       }
-    } catch (error) {
-      console.error("Error updating liked status: ", error);
-      alert("Failed to update the like status. Please try again.");
     }
-  };
+  } catch (error) {
+    console.error("Error updating liked status: ", error);
+    alert("Failed to update the like status. Please try again.");
+  }
+};
+
 
   const renderListItem = ({ item }) => {
     let embedURL = item.url;
@@ -387,7 +407,7 @@ const styles = StyleSheet.create({
     paddingTop: 30,
   },
   header: {
-    marginBottom: 20,
+    marginVertical: 30,
   },
   title: {
     fontSize: 28,
