@@ -12,7 +12,7 @@ export default function YourProfile() {
     // Handle the sign-out process
     const handleSignOut = () => {
         console.log("Sign out confirmed");
-        navigation.navigate('loginScreen'); // Navigate to login screen
+        navigation.navigate('LogInScreen'); // Navigate to login screen
     };
 
     // Handle footer navigation

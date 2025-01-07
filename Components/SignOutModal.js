@@ -1,7 +1,7 @@
 import React from 'react';
 import { Modal, StyleSheet, View, Text, TouchableOpacity, Animated } from 'react-native';
 
-export default function SignOutModal({ visible, onClose, onConfirm }) {
+export default function LogOutModal({ visible, onClose, onConfirm }) {
     const [fadeAnim] = React.useState(new Animated.Value(0));
     const [bgAnim] = React.useState(new Animated.Value(0));
 
@@ -46,10 +46,10 @@ export default function SignOutModal({ visible, onClose, onConfirm }) {
         >
             <Animated.View style={[styles.modalContainer, { opacity: bgAnim }]}>
                 <Animated.View style={[styles.modalContent, { opacity: fadeAnim }]}>
-                    <Text style={styles.modalText}>Are you sure to sign out?</Text>
+                    <Text style={styles.modalText}>Are you sure to log out?</Text>
                     <View style={styles.buttonContainer}>
                         <TouchableOpacity style={styles.confirmButton} onPress={onConfirm}>
-                            <Text style={styles.buttonText}>Sign Out</Text>
+                            <Text style={styles.buttonText}>Log Out</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
                             <Text style={styles.buttonText}>Cancel</Text>

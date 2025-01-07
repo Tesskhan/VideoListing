@@ -1,8 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Modal, TextInput } from "react-native";
 import { useNavigation } from '@react-navigation/native';
 import FSection from '../Components/FSection';
 import Icon from 'react-native-vector-icons/FontAwesome';
+import { db, auth } from '../firebaseConfig'; // Import Firestore and Auth
+import { collection, addDoc, getDocs, deleteDoc, doc } from 'firebase/firestore';
 
 const YourLists = () => {
   const navigation = useNavigation();
@@ -13,49 +15,77 @@ const YourLists = () => {
   const [isBinActive, setIsBinActive] = useState(false);
   const [selectedLists, setSelectedLists] = useState({});
 
+  useEffect(() => {
+    // Fetch lists from Firestore when the component mounts
+    const fetchLists = async () => {
+      const user = auth.currentUser;
+      if (user) {
+        const querySnapshot = await getDocs(collection(db, "users", user.uid, "lists"));
+        const fetchedLists = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setLists(fetchedLists);
+      }
+    };
+
+    fetchLists();
+  }, []);
+
   const handlePress = (id) => {
     if (id === 1) navigation.navigate("YourFavourites");
     else if (id === 2) navigation.navigate("YourLists");
     else if (id === 3) navigation.navigate("YourProfile");
   };
 
-  const handleAddList = () => {
+  const handleAddList = async () => {
     if (newListName.trim() && newListDescription.trim()) {
-      setLists([...lists, { title: newListName, description: newListDescription, seen: false }]);
-      setNewListName("");
-      setNewListDescription("");
-      setModalVisible(false);
+      const user = auth.currentUser;
+      if (user) {
+        const docRef = await addDoc(collection(db, "users", user.uid, "lists"), {
+          title: newListName,
+          description: newListDescription,
+        });
+        setLists([...lists, { id: docRef.id, title: newListName, description: newListDescription }]);
+        setNewListName("");
+        setNewListDescription("");
+        setModalVisible(false);
+      }
     }
   };
 
-  const handleDeleteSelected = () => {
+  const handleDeleteSelected = async () => {
     if (isBinActive) {
-      // Delete selected lists
-      const filteredLists = lists.filter((_, index) => !selectedLists[index]);
-      setLists(filteredLists);
-      setSelectedLists({});
-      setIsBinActive(false);
+      const user = auth.currentUser;
+      if (user) {
+        const filteredLists = lists.filter((list, index) => {
+          if (selectedLists[index]) {
+            deleteDoc(doc(db, "users", user.uid, "lists", list.id));
+            return false;
+          }
+          return true;
+        });
+        setLists(filteredLists);
+        setSelectedLists({});
+        setIsBinActive(false);
+      }
     } else {
-      // Activate bin mode
       setIsBinActive(true);
     }
   };
-  
+
   const handleCancelDelete = () => {
     setIsBinActive(false);
     setSelectedLists({});
   };
-  
+
   const toggleSelection = (index) => {
     setSelectedLists((prev) => ({
       ...prev,
-      [index]: !prev[index], // Toggle the selection status
+      [index]: !prev[index],
     }));
   };
-  
+
   const renderListItem = ({ item, index }) => {
-    const isSelected = !!selectedLists[index]; // Check if the current item is selected
-  
+    const isSelected = !!selectedLists[index];
+
     return (
       <TouchableOpacity
         style={[
@@ -63,9 +93,9 @@ const YourLists = () => {
         ]}
         onPress={() => {
           if (isBinActive) {
-            toggleSelection(index); // Toggle selection in bin mode
+            toggleSelection(index);
           } else {
-            navigation.navigate('ListVideos', { list: item }); // Navigate if not in bin mode
+            navigation.navigate('ListVideos', { list: item });
           }
         }}
       >
@@ -87,7 +117,7 @@ const YourLists = () => {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Your Lists</Text>
- 
+
       <FlatList
         data={lists}
         renderItem={renderListItem}
@@ -99,39 +129,36 @@ const YourLists = () => {
         }
       />
 
-      {/* Extra buttons */}
-        <View style={styles.extraButtonsRow}>
-          {/* Bin Button */}
-          <TouchableOpacity 
-            style={[styles.extraButton, isBinActive ? styles.binActiveButton : null]} 
-            onPress={handleDeleteSelected}  // This now handles both activation and deletion
-          >
-            <Icon 
-              name={isBinActive ? "check" : "trash"}  // 'check' for confirmation, 'trash' for initial state
-              size={30} 
-              color="white" 
-            />
-          </TouchableOpacity>
-  
-          {/* Add / Cross Button */}
-          <TouchableOpacity 
-            style={[styles.extraButton, isBinActive ? styles.addActiveButton : null]} 
-            onPress={() => {
-              if (isBinActive) {
-                setIsBinActive(false);  // Cancel the delete mode if bin is active
-              } else {
-                setModalVisible(true);   // Show the modal for adding a video if bin is inactive
-              }
-            }}
-          >
-            <Icon 
-              name={isBinActive ? "times" : "plus"}  // Show 'times' when bin is active, else 'plus'
-              size={30} 
-              color="white" 
-            />
-          </TouchableOpacity>
-        </View>
-      {/* Add List Modal */}
+      <View style={styles.extraButtonsRow}>
+        <TouchableOpacity
+          style={[styles.extraButton, isBinActive ? styles.binActiveButton : null]}
+          onPress={handleDeleteSelected}
+        >
+          <Icon
+            name={isBinActive ? "check" : "trash"}
+            size={30}
+            color="white"
+          />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.extraButton, isBinActive ? styles.addActiveButton : null]}
+          onPress={() => {
+            if (isBinActive) {
+              setIsBinActive(false);
+            } else {
+              setModalVisible(true);
+            }
+          }}
+        >
+          <Icon
+            name={isBinActive ? "times" : "plus"}
+            size={30}
+            color="white"
+          />
+        </TouchableOpacity>
+      </View>
+
       <Modal visible={modalVisible} transparent animationType="slide">
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
@@ -154,7 +181,6 @@ const YourLists = () => {
             />
 
             <View style={styles.modalButtons}>
-              {/* Cancel Button */}
               <TouchableOpacity
                 style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => setModalVisible(false)}
@@ -162,7 +188,6 @@ const YourLists = () => {
                 <Text style={styles.modalButtonText}>Cancel</Text>
               </TouchableOpacity>
 
-              {/* Confirm Button */}
               <TouchableOpacity
                 style={[styles.modalButton, styles.confirmButton]}
                 onPress={handleAddList}
@@ -182,7 +207,6 @@ const YourLists = () => {
 };
 
 const styles = StyleSheet.create({
-  // General container styles
   container: {
     flex: 1,
     backgroundColor: "#222",
@@ -206,8 +230,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#999",
   },
-
-  // Card styles
   card: {
     backgroundColor: "#CCC",
     padding: 15,
@@ -236,9 +258,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: "#444",
     padding: 10,
-  },  
-
-  // Extra buttons
+  },
   extraButtonsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -262,8 +282,6 @@ const styles = StyleSheet.create({
   addActiveButton: {
     backgroundColor: "#B00",
   },
-
-  // Modal styles
   modalContainer: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.6)",

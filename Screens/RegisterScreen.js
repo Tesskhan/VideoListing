@@ -2,21 +2,21 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { auth } from '../firebaseConfig';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
 
-const LogInScreen = () => {
+const RegisterScreen = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const navigation = useNavigation();
 
-  const handleLogin = () => {
-    signInWithEmailAndPassword(auth, email, password)
+  const handleRegister = () => {
+    createUserWithEmailAndPassword(auth, email, password)
       .then((userCredential) => {
         const user = userCredential.user;
-        Alert.alert('Success', 'Logged in successfully!');
+        Alert.alert('Success', 'Account created successfully!');
         console.log('User:', user);
-        navigation.navigate('YourLists');
+        navigation.navigate('YourLists'); // Navigate to the YourLists screen
       })
       .catch((error) => {
         const errorMessage = error.message;
@@ -27,43 +27,43 @@ const LogInScreen = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Log In</Text>
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          placeholderTextColor="#888"
-        />
-      </View>
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry={!isPasswordVisible}
-          placeholderTextColor="#888"
-        />
-        <TouchableOpacity
-          style={styles.toggleButton}
-          onPress={() => setIsPasswordVisible(!isPasswordVisible)}
-        >
-          <Text style={styles.toggleButtonText}>
-            {isPasswordVisible ? 'Hide' : 'Show'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-      <TouchableOpacity style={styles.button} onPress={handleLogin}>
-        <Text style={styles.buttonText}>Log In</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.registerButton} onPress={() => navigation.navigate('RegisterScreen')}>
-        <Text style={styles.registerButtonText}>Register</Text>
-      </TouchableOpacity>
-    </View>
+          <Text style={styles.title}>Register</Text>
+          <View style={styles.inputContainer}>
+            <TextInput
+              style={styles.input}
+              placeholder="Email"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              placeholderTextColor="#888"
+            />
+          </View>
+          <View style={styles.inputContainer}>
+            <TextInput
+              style={styles.input}
+              placeholder="Password"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!isPasswordVisible}
+              placeholderTextColor="#888"
+            />
+            <TouchableOpacity
+              style={styles.toggleButton}
+              onPress={() => setIsPasswordVisible(!isPasswordVisible)}
+            >
+              <Text style={styles.toggleButtonText}>
+                {isPasswordVisible ? 'Hide' : 'Show'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity style={styles.button} onPress={handleRegister}>
+            <Text style={styles.buttonText}>Register</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.registerButton} onPress={() => navigation.navigate('LogInScreen')}>
+            <Text style={styles.registerButtonText}>Log in</Text>
+          </TouchableOpacity>
+        </View>
   );
 };
 
@@ -129,4 +129,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default LogInScreen;
+export default RegisterScreen;

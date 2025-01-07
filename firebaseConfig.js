@@ -5,13 +5,13 @@ import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCSDKIqEWXfqQVnuHBL8r09knEA91HNfT4",
-  authDomain: "to-do-list-app-97ecf.firebaseapp.com",
-  projectId: "to-do-list-app-97ecf",
-  storageBucket: "to-do-list-app-97ecf.firebasestorage.app",
-  messagingSenderId: "11228058009",
-  appId: "1:11228058009:web:a5e5bc7e07101b8f338308",
-  measurementId: "G-FHB92DZSVP"
+  apiKey: "AIzaSyBBLrA6l5DbXN45jBzjKDhaU5jMR3-_9NI",
+  authDomain: "videolisting-55585.firebaseapp.com",
+  projectId: "videolisting-55585",
+  storageBucket: "videolisting-55585.firebasestorage.app",
+  messagingSenderId: "43864299622",
+  appId: "1:43864299622:web:95e5048ee6fc6571a475a7",
+  measurementId: "G-L2G2PRTV5T"
 };
 
 // Inicializar Firebase
