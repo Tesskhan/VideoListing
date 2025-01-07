@@ -1,13 +1,50 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, Text, FlatList, TouchableOpacity, StyleSheet } from "react-native";
-import { useNavigation } from '@react-navigation/native';
-import FSection from '../Components/FSection'; // Assuming this is your custom footer section
-import Icon from 'react-native-vector-icons/FontAwesome';
+import { useRoute, useNavigation } from "@react-navigation/native";
+import Icon from "react-native-vector-icons/FontAwesome";
+import { WebView } from "react-native-webview";
+import FSection from "../Components/FSection";
+import { db, auth } from '../firebaseConfig'; 
+import { collection, getDocs, updateDoc, doc } from 'firebase/firestore';
 
 const YourFavourites = () => {
+  const route = useRoute();
   const navigation = useNavigation();
-  const [lists, setLists] = useState([]); // Placeholder for list data
-  const [pressedItems, setPressedItems] = useState({});
+
+  // Set fallback in case list is undefined
+  const list = route.params?.list || { id: null, content: [], title: "", description: "" };
+  const listId = list.id;
+
+  const [isSelected, setIsSelected] = useState(false);
+  const [seenVideos, setSeenVideos] = useState({});
+  const [updatedList, setUpdatedList] = useState({
+    ...list,
+    content: list.content || [],
+  });
+
+  useEffect(() => {
+    const fetchVideos = async () => {
+      const user = auth.currentUser;
+      if (user && listId) {
+        const videosQuery = collection(db, "users", user.uid, "lists", listId, "videos");
+        const querySnapshot = await getDocs(videosQuery);
+        const videos = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        setUpdatedList((prev) => ({
+          ...prev,
+          content: videos,
+        }));
+
+        const initialSeenState = videos.reduce((acc, video) => {
+          acc[video.id] = video.seen || false;
+          return acc;
+        }, {});
+        setSeenVideos(initialSeenState);
+      }
+    };
+
+    fetchVideos();
+  }, [listId]);
 
   const handlePress = (id) => {
     if (id === 1) navigation.navigate("YourFavourites");
@@ -15,79 +52,162 @@ const YourFavourites = () => {
     else if (id === 3) navigation.navigate("YourProfile");
   };
 
-  const handlePressIn = (index) => {
-    setPressedItems((prevState) => ({ ...prevState, [index]: true }));
+  const handleSeenToggle = async (videoId) => {
+    try {
+      const user = auth.currentUser;
+      if (user) {
+        const videoRef = doc(db, "users", user.uid, "lists", listId, "videos", videoId);
+        const seen = !seenVideos[videoId];
+
+        await updateDoc(videoRef, { seen });
+
+        setSeenVideos((prev) => ({
+          ...prev,
+          [videoId]: seen,
+        }));
+      }
+    } catch (error) {
+      console.error("Error updating seen status: ", error);
+    }
   };
 
-  const handlePressOut = (index) => {
-    setPressedItems((prevState) => ({ ...prevState, [index]: false }));
-  };
+  const renderListItem = ({ item }) => {
+    let embedURL = item.url;
 
-  const renderListItem = ({ item, index }) => {
+    if (item.url.includes("youtube.com/watch")) {
+      embedURL = `https://www.youtube.com/embed/${item.url.split("v=")[1].split("&")[0]}`;
+    } else if (item.url.includes("youtu.be")) {
+      const videoId = item.url.split("/").pop();
+      embedURL = `https://www.youtube.com/embed/${videoId}`;
+    } else if (item.url.includes("instagram.com/p")) {
+      const postId = item.url.split("/p/")[1].split("/")[0];
+      embedURL = `https://www.instagram.com/p/${postId}/embed`;
+    } else if (item.url.includes("instagram.com/reel")) {
+      const reelId = item.url.split("/reel/")[1].split("/")[0];
+      embedURL = `https://www.instagram.com/reel/${reelId}/embed`;
+    }
+
+    const seen = seenVideos[item.id] || false;
+
     return (
-      <TouchableOpacity
-        style={[styles.card, pressedItems[index] && { backgroundColor: '#DDD' }]} // Adjust background color when pressed
-        onPressIn={() => handlePressIn(index)}
-        onPressOut={() => handlePressOut(index)}
-      >
+      <View style={styles.card}>
         <View style={styles.cardContent}>
-          <Text style={styles.cardTitle}>{item.title}</Text>
+          <Text style={styles.cardTitle}>{item.name}</Text>
           <Text style={styles.cardDescription}>{item.description}</Text>
+
+          <WebView
+            source={{ uri: embedURL }}
+            style={styles.youtubeVideoPlayer}
+            allowsFullscreenVideo={true}
+            originWhitelist={["*"]}
+          />
+
+          <View style={styles.buttonRow}>
+            <TouchableOpacity onPress={() => handleSeenToggle(item.id)} style={styles.button}>
+              <Icon
+                name={seen ? "eye" : "eye-slash"}
+                size={20}
+                color="gray"
+              />
+            </TouchableOpacity>
+          </View>
         </View>
-        <Icon name="chevron-right" style={styles.arrowSymbol} />
-      </TouchableOpacity>
+      </View>
     );
   };
 
   return (
     <View style={styles.container}>
-      {/* Title */}
-      <Text style={styles.title}>Your Favourites</Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>{updatedList.title}</Text>
+        <Text style={styles.description}>{updatedList.description}</Text>
+      </View>
 
-      {/* Filter Button */}
-      <TouchableOpacity style={styles.filterButton}>
-        <Icon name="filter" size={20} color="white" />
-        <Text style={styles.filterText}>Filter</Text>
+      <TouchableOpacity style={styles.filterButton} onPress={() => setIsSelected(!isSelected)}>
+        <Icon
+          name={isSelected ? "eye" : "eye-slash"}
+          size={20}
+          color="white"
+        />
+        <Text style={styles.filterText}>{isSelected ? "Seen" : "Not Seen"}</Text>
       </TouchableOpacity>
 
-      {/* Lists */}
       <FlatList
-        data={lists}
+        data={updatedList.content.filter((video) => {
+          const isSeen = seenVideos[video.id] || false;
+          return isSelected ? isSeen : !isSeen;
+        })}
+        keyExtractor={(item) => item.id}
         renderItem={renderListItem}
-        keyExtractor={(item, index) => index.toString()}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No favourite videos yet.</Text>
-          </View>
-        }
+        ListEmptyComponent={<Text style={styles.noContentText}>No content available for this filter.</Text>}
+        contentContainerStyle={{ paddingBottom: 125 }}
       />
 
-      {/* Footer section */}
       <View style={styles.footerContainer}>
-        <FSection currentSection={1} onPress={handlePress} />
+        <FSection currentSection={4} onPress={handlePress} />
       </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: "#222", 
-    paddingHorizontal: 20, 
-    paddingTop: 30, 
+  container: {
+    flex: 1,
+    backgroundColor: "#222",
+    paddingHorizontal: 20,
+    paddingTop: 30,
   },
-  title: { 
-    fontSize: 28, 
-    fontWeight: "bold", 
-    color: "#FFF", 
-    textAlign: "center", 
-    margin: 30, 
+  header: {
+    marginBottom: 20,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: "bold",
+    color: "#FFF",
+    textAlign: "center",
+  },
+  description: {
+    fontSize: 18,
+    color: "#BBB",
+    textAlign: "center",
+    marginTop: 10,
+  },
+  card: {
+    backgroundColor: "#CCC",
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+  cardContent: {
+    flex: 1,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#000",
+  },
+  cardDescription: {
+    fontSize: 14,
+    color: "#444",
+    marginTop: 5,
+  },
+  noContentText: {
+    color: "#999",
+    fontSize: 16,
+    textAlign: "center",
+  },
+  buttonRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    marginTop: 10,
+  },
+  button: {
+    marginHorizontal: 10,
   },
   filterButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: '#777',
     width: 110,
     height: 40,
@@ -95,57 +215,25 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginBottom: 20,
   },
-  filterText: { 
-    marginLeft: 8, 
-    color: 'white', 
-    fontSize: 16, 
-    fontWeight: 'bold' 
-  },
-  card: {
-    backgroundColor: "#EEE",
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 10,
-    minHeight: 100, // Ensure the card is high enough for two lines of description
-    flexDirection: "row", // Align text and arrow side by side
-    justifyContent: "space-between", // Place the arrow on the right
-    alignItems: "center", // Align the content vertically
-  },
-  cardContent: {
-    flex: 1, // Make sure the text takes up the available space
-  },
-  cardTitle: {
-    fontSize: 18,
+  filterText: {
+    marginLeft: 8,
+    color: "white",
+    fontSize: 16,
     fontWeight: "bold",
-    color: "#333",
   },
-  cardDescription: {
-    fontSize: 14,
-    color: "#666",
-    marginTop: 5,
-    lineHeight: 18, // Ensure two lines of description fit comfortably
+  footerContainer: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1,
   },
-  arrowSymbol: {
-    fontSize: 20,
-    color: "#444", // Set the color of the arrow
-    padding: 10, // Add space between text and the arrow
-  },
-  emptyContainer: { 
-    flex: 1, 
-    justifyContent: "center", 
-    alignItems: "center", 
-    marginTop: 50, 
-  },
-  emptyText: { 
-    fontSize: 16, 
-    color: "#999", 
-  },
-  footerContainer: { 
-    position: 'absolute', 
-    left: 0, 
-    right: 0, 
-    bottom: 0, 
-    zIndex: 1 
+  youtubeVideoPlayer: {
+    width: "100%",
+    height: 200,
+    marginTop: 10,
+    borderRadius: 10,
+    overflow: "hidden",
   },
 });
 

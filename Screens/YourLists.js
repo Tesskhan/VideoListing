@@ -129,6 +129,7 @@ const YourLists = () => {
         }
       />
 
+      {/* Extra buttons */}
       <View style={styles.extraButtonsRow}>
         <TouchableOpacity
           style={[styles.extraButton, isBinActive ? styles.binActiveButton : null]}

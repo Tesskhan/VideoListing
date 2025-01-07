@@ -5,7 +5,7 @@ import Icon from "react-native-vector-icons/FontAwesome";
 import { WebView } from "react-native-webview";
 import FSection from "../Components/FSection";
 import { db, auth } from '../firebaseConfig'; // Import Firestore and Auth
-import { collection, addDoc, getDocs, deleteDoc, doc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 
 const ListVideos = () => {
   const { params: { list } } = useRoute();  // Ensure `list` exists in the route
@@ -33,16 +33,31 @@ const ListVideos = () => {
       if (user && listId) {
         const videosQuery = collection(db, "users", user.uid, "lists", listId, "videos");
         const querySnapshot = await getDocs(videosQuery);
-        const videos = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const videos = querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  
         setUpdatedList((prev) => ({
           ...prev,
           content: videos,
         }));
+  
+        // Extract initial seen and liked states from Firestore
+        const initialSeenState = videos.reduce((acc, video) => {
+          acc[video.id] = video.seen || false; // Default to false if not present
+          return acc;
+        }, {});
+  
+        const initialLikedState = videos.reduce((acc, video) => {
+          acc[video.id] = video.liked || false; // Default to false if not present
+          return acc;
+        }, {});
+  
+        setSeenVideos(initialSeenState);
+        setLikedVideos(initialLikedState); // Initialize likedVideos state
       }
     };
   
     fetchVideos();
-  }, [listId]);  // Re-fetch when listId changes
+  }, [listId]);  
   
   const handlePress = (id) => {
     if (id === 1) navigation.navigate("YourFavourites");
@@ -91,29 +106,26 @@ const ListVideos = () => {
   
   const handleDeleteSelected = async () => {
     if (isBinActive) {
-      // Filter out the videos that are selected for deletion
-      const videosToDelete = Object.keys(selectedVideos).filter((key) => selectedVideos[key]);
+      const videosToDelete = Object.keys(selectedVideos).filter((key) => selectedVideos[key]); // Gets selected videos
       const filteredContent = updatedList.content.filter(
-        (video) => !selectedVideos[video.url]
+        (video) => !selectedVideos[video.id] // Excludes selected videos from the list
       );
   
-      // Delete from Firestore
       const user = auth.currentUser;
       if (user) {
-        for (const videoUrl of videosToDelete) {
-          const videoDocRef = doc(db, "users", user.uid, "lists", listId, "videos", videoUrl);
-          await deleteDoc(videoDocRef);
+        for (const videoId of videosToDelete) {
+          await deleteDoc(doc(db, "users", user.uid, "lists", listId, "videos", videoId)); // Deletes selected videos
         }
       }
   
-      // Update local state
-      setUpdatedList((prevList) => ({ ...prevList, content: filteredContent }));
+      setUpdatedList((prevList) => ({ ...prevList, content: filteredContent })); // Updates local state
       setSelectedVideos({});
-      setIsBinActive(false);
+      setIsBinActive(false); // Exits "delete mode"
     } else {
-      setIsBinActive(true);
+      setIsBinActive(true); // Activates "delete mode"
     }
-  };  
+  };
+  
   
   const handleCancelDelete = () => {
     // Cancel the deletion action and reset bin state
@@ -144,18 +156,48 @@ const ListVideos = () => {
     setCurrentVideoURL(embedURL);
   };
 
-  const handleSeenToggle = (videoId) => {
-    setSeenVideos((prev) => ({
-      ...prev,
-      [videoId]: !prev[videoId],
-    }));
-  };
+  const handleSeenToggle = async (videoId) => {
+    try {
+      const user = auth.currentUser;
+      if (user) {
+        const videoRef = doc(db, "users", user.uid, "lists", listId, "videos", videoId);
+        const seen = !seenVideos[videoId]; // Toggle local seen state
+  
+        // Update the Firestore document
+        await updateDoc(videoRef, { seen });
+  
+        // Update local state
+        setSeenVideos((prev) => ({
+          ...prev,
+          [videoId]: seen,
+        }));
+      }
+    } catch (error) {
+      console.error("Error updating seen status: ", error);
+      alert("Failed to update the seen status. Please try again.");
+    }
+  };  
 
-  const handleLikeToggle = (videoId) => {
-    setLikedVideos((prev) => ({
-      ...prev,
-      [videoId]: !prev[videoId],
-    }));
+  const handleLikeToggle = async (videoId) => {
+    try {
+      const user = auth.currentUser;
+      if (user) {
+        const videoRef = doc(db, "users", user.uid, "lists", listId, "videos", videoId);
+        const liked = !likedVideos[videoId]; // Toggle local liked state
+  
+        // Update the Firestore document
+        await updateDoc(videoRef, { liked });
+  
+        // Update local state
+        setLikedVideos((prev) => ({
+          ...prev,
+          [videoId]: liked,
+        }));
+      }
+    } catch (error) {
+      console.error("Error updating liked status: ", error);
+      alert("Failed to update the like status. Please try again.");
+    }
   };
 
   const renderListItem = ({ item }) => {
@@ -175,9 +217,9 @@ const ListVideos = () => {
       embedURL = `https://www.instagram.com/reel/${reelId}/embed`;
     }
   
-    const seen = seenVideos[item.url] || false;
-    const liked = likedVideos[item.url] || false;
-    const isSelected = selectedVideos[item.url] || false;
+    const seen = seenVideos[item.id] || false;
+    const liked = likedVideos[item.id] || false;
+    const isSelected = selectedVideos[item.id] || false;
   
     return (
       <View style={styles.card}>
@@ -194,7 +236,7 @@ const ListVideos = () => {
   
           {/* Bottom buttons under the video */}
           <View style={styles.buttonRow}>
-            <TouchableOpacity onPress={() => handleSeenToggle(item.url)} style={styles.button}>
+            <TouchableOpacity onPress={() => handleSeenToggle(item.id)} style={styles.button}>
               <Icon
                 name={seen ? "eye" : "eye-slash"}
                 size={20}
@@ -202,7 +244,7 @@ const ListVideos = () => {
               />
             </TouchableOpacity>
   
-            <TouchableOpacity onPress={() => handleLikeToggle(item.url)} style={styles.button}>
+            <TouchableOpacity onPress={() => handleLikeToggle(item.id)} style={styles.button}>
               <Icon
                 name={liked ? "heart" : "heart-o"}
                 size={20}
@@ -212,7 +254,7 @@ const ListVideos = () => {
   
             {/* Show the bin icon for selection if the bin is active */}
             {isBinActive && (
-              <TouchableOpacity onPress={() => handleSelectVideo(item.url)} style={styles.button}>
+              <TouchableOpacity onPress={() => handleSelectVideo(item.id)} style={styles.button}>
                 <Icon
                   name={isSelected ? "check" : "times"}
                   size={20}
@@ -247,15 +289,15 @@ const ListVideos = () => {
       {/* Video List */}
       <FlatList
         data={updatedList.content.filter((video) => {
-          const isSeen = seenVideos[video.url] || false;
+          const isSeen = seenVideos[video.id] || false;
           return isSelected ? isSeen : !isSeen;
         })}
-        keyExtractor={(item) => item.url}
+        keyExtractor={(item) => item.id}
         renderItem={renderListItem}
         ListEmptyComponent={<Text style={styles.noContentText}>No content available for this filter.</Text>}
         contentContainerStyle={{ paddingBottom: 125 }}
       />
-  
+
       {/* Extra buttons */}
       <View style={styles.extraButtonsRow}>
         {/* Bin Button */}
@@ -275,14 +317,14 @@ const ListVideos = () => {
           style={[styles.extraButton, isBinActive ? styles.addActiveButton : null]} 
           onPress={() => {
             if (isBinActive) {
-              setIsBinActive(false);  // Cancel the delete mode if bin is active
+              setIsBinActive(false);
             } else {
-              setModalVisible(true);   // Show the modal for adding a video if bin is inactive
+              setModalVisible(true);
             }
           }}
         >
           <Icon 
-            name={isBinActive ? "times" : "plus"}  // Show 'times' when bin is active, else 'plus'
+            name={isBinActive ? "times" : "plus"}
             size={30} 
             color="white" 
           />
